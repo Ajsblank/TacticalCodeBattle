@@ -1,9 +1,9 @@
 #!/bin/bash
 BLUE_PORT=8080
 GREEN_PORT=8081
-APP_DIR=/home/ubuntu/app
+APP_DIR=/home/opc/app
 SERVICE_URL_INC=/etc/nginx/conf.d/service-url.inc
-ECR_IMAGE=$1  # 인자로 이미지 URI 받음
+IMAGE=$1  # 인자로 이미지 URI 받음
 
 # 환경변수 로드
 set -a
@@ -27,13 +27,6 @@ fi
 echo "▶ 현재 서비스 포트: $ACTIVE_PORT"
 echo "▶ 새 버전 실행 포트: $IDLE_PORT"
 
-# ECR 로그인
-aws ecr get-login-password --region $AWS_REGION | \
-    docker login --username AWS --password-stdin $ECR_REGISTRY
-
-# 이미지 pull
-docker pull $ECR_IMAGE
-
 # 새 컨테이너 실행
 docker stop $IDLE_CONTAINER 2>/dev/null || true
 docker rm $IDLE_CONTAINER 2>/dev/null || true
@@ -42,7 +35,7 @@ docker run -d \
     --network host \
     --env-file $APP_DIR/.env \
     -e SERVER_PORT=$IDLE_PORT \
-    $ECR_IMAGE
+    $IMAGE
 
 # Health check
 echo "▶ Health check 시작..."
@@ -72,4 +65,5 @@ echo "▶ 기존 컨테이너 $ACTIVE_CONTAINER 종료"
 docker stop $ACTIVE_CONTAINER 2>/dev/null || true
 docker rm $ACTIVE_CONTAINER 2>/dev/null || true
 
+docker image prune -f
 echo "🎉 배포 완료 — 현재 서비스 포트: $IDLE_PORT"
