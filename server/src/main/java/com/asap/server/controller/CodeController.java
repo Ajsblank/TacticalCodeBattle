@@ -82,14 +82,6 @@ public class CodeController {
                     "PENDING");
             submissionRepository.save(submission);
 
-            // S3 업로드
-            String key = s3Service.buildCodeSubmissionKey(request.getProblemId(),
-                    request.getUserId(), submission.getId());
-            s3Service.uploadCode(key, request.getSourceCode());
-
-            submission.changeCodeUrl(key);
-            submissionRepository.save(submission);
-
             // 참가자 테이블을 조회한다
             Long userId = submission.getUser().getId();
             Long contestId = submission.getContest().getId();

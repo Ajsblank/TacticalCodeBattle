@@ -13,8 +13,6 @@ import com.asap.server.dto.request.EmailResendRequest;
 import com.asap.server.dto.request.EmailVerifyRequest;
 import com.asap.server.dto.request.LoginRequest;
 import com.asap.server.dto.request.SignupRequest;
-import com.asap.server.dto.request.SmsCodeVerifyRequest;
-import com.asap.server.dto.request.SmsVerifyRequest;
 import com.asap.server.dto.request.WithdrawRequest;
 import com.asap.server.dto.response.LoginResponse;
 import com.asap.server.dto.response.TokenRefreshResponse;
@@ -94,20 +92,6 @@ public class AuthController {
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
                 .build());
-    }
-
-    @Operation(summary = "SMS 인증번호 발송")
-    @PostMapping("/sms/send")
-    public ResponseEntity<String> sendSMS(@Valid @RequestBody SmsVerifyRequest request) {
-        authService.sendSMS(request);
-        return ResponseEntity.ok("SMS 인증번호를 발송하였습니다.");
-    }
-
-    @Operation(summary = "SMS 인증 완료")
-    @PostMapping("/sms/verify")
-    public ResponseEntity<String> verifySMS(@Valid @RequestBody SmsCodeVerifyRequest request) {
-        authService.verifySMS(request);
-        return ResponseEntity.ok("SMS 인증이 완료되었습니다.");
     }
 
 }
