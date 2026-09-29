@@ -2,11 +2,11 @@ services:
   postgres:
     image: postgres:16
     container_name: asap-db
-    restart: always
+    restart: no
     environment:
       POSTGRES_USER: asap
-      POSTGRES_PASSWORD: ascrrqbwk
-      POSTGRES_DB: code_battle_db
+      POSTGRES_PASSWORD: qhanf123
+      POSTGRES_DB: asap-db
     ports:
       - "5432:5432"
     volumes:
@@ -21,7 +21,7 @@ services:
   redis:
     image: redis:7
     container_name: asap-redis
-    restart: always
+    restart: no
     ports:
       - "6379:6379"
 

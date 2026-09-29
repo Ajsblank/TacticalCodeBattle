@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,8 +25,7 @@ public class ProfileService {
   private final usersRepository userRepository;
   private final ProfileRepository profileRepository;
   private final S3Service s3Service;
-  @Value("${cloud.aws.cloudfront.url}")
-  private String cloudFrontDomain;
+  private String cloudFrontDomain = "empty";
 
   @Transactional(readOnly = true)
   public ProfileResponse getMyProfile(Long userId) {

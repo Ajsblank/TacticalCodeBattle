@@ -81,7 +81,7 @@ public class SecurityConfig {
                                 "/api/auth/mail/send", "/api/auth/sms/send", "/api/auth/sms/verify",
                                 "/api/auth/refresh", "/api/auth/auto-login", "/api/auth/temp-signup")
                         .permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/contests", "/api/contests/**").permitAll()
                         .requestMatchers("/api/contests/*/resources/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/contests", "/api/contests/create",

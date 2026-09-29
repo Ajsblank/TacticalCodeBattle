@@ -1,5 +1,5 @@
 # git action workflow name
-name: cd-server
+name: Deploy(dev/server)
 # executing name, can use environment variables
 run-name: "CD actor : ${{github.actor}}"
 # Controls when the workflow will run
@@ -8,30 +8,11 @@ on:
     branches: ["dev/server"]
     paths:
       - 'server/**'
-      - '.github/workflows/*'
+      - '.github/workflows/cd-server.yml'
 
 jobs:
-  filter:
-    runs-on: ubuntu-latest
-    outputs: 
-      server_change:  ${{steps.filter_server.outputs.server || 'false'}}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v4
-        name: check if server directory exits
-        if: hashFiles('server/**') !=  ''
-        id: filter_server
-        with:
-          filters: |
-            server:
-              - 'server/**'
-              - '.github/workflows/*'
-
   server:
-    needs: filter
-    if: needs.filter.outputs.server_change == 'true'
     permissions: 
-      id-token: write
       contents: read
     runs-on: ubuntu-latest
     defaults:
@@ -39,16 +20,14 @@ jobs:
         working-directory: server
     env: 
       DB_USER: ${{ secrets.DB_USER }}
-      DB_NAME: ${{ secrets.DB_NAME_STAGING }}
+      DB_NAME: ${{ secrets.DB_NAME }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-      DB_URL: ${{ secrets.DB_URL_STAGING }}
+      DB_URL: ${{ secrets.DB_URL }}
       JWT_TOKEN: ${{secrets.JWT_TOKEN}}
+      GMAIL_EMAIL: ${{secrets.GMAIL_EMAIL}}
       GMAIL_PASSWORD: ${{secrets.GMAIL_PASSWORD}}
-      SOL_API_KEY: ${{secrets.SOL_API_KEY}}
-      SOL_API_SECRET: ${{secrets.SOL_API_SECRET}}
-      SOL_SENDER_NUMBER: ${{secrets.SOL_SENDER_NUMBER}}
-      TOSS_CLIENT_KEY: ${{secrets.TOSS_CLIENT_KEY}}
-      TOSS_SECRET_KEY: ${{secrets.TOSS_SECRET_KEY}}
+      CORS_ALLOWED_ORIGINS: ${{ vars.CORS_ALLOWED_ORIGINS }}
+      OCI_HOST: ${{ secrets.OCI_HOST }}
       
     steps:
       - uses: actions/checkout@v4
@@ -62,147 +41,50 @@ jobs:
         run: chmod +x gradlew 
 
       - name: server test
-        run: ./gradlew test jacocoTestReport
+        run: ./gradlew test
+
       - name: server build
         run: ./gradlew build -x test
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{secrets.ARN_ROLE}}
-          aws-region: ${{ vars.AWS_REGION }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2 
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
-        id: build-image
+      - name: Build arm64 image
+        run: |
+          docker buildx build --platform linux/arm64 \
+            -t asap-tcb-server:${{ github.sha }} --load .
+
+      - name: Deploy to OCI
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: caps-asap-server
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE: asap-tcb-server:${{ github.sha }}
+          OCI_SSH_KEY: ${{ secrets.OCI_SSH_KEY }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          mkdir -p ~/.ssh
+          echo "$OCI_SSH_KEY" > ~/.ssh/oci_key
+          chmod 600 ~/.ssh/oci_key
+          ssh-keyscan "$OCI_HOST" >> ~/.ssh/known_hosts
+          SSH="ssh -i $HOME/.ssh/oci_key opc@$OCI_HOST"
 
-      - name: Upload deploy.sh to S3
-        run: |
-          aws s3 cp deploy.sh s3://${{ secrets.AWS_BUCKET_TEST }}/backend-deploy/deploy/deploy.sh
+          echo "이미지 전송..."
+          docker save "$IMAGE" | gzip | $SSH "gunzip | docker load"
 
-      - name: Upload JaCoCo report to S3
-        run: |
-          aws s3 sync build/reports/jacoco/test/html/ \
-          s3://${{ secrets.AWS_BUCKET_TEST }}/backend-deploy/jacoco/${{ github.sha }}/
+          echo ".env 작성..."
+          cat <<EOF | $SSH "mkdir -p ~/app && umask 077 && cat > ~/app/.env"
+          DB_URL=$DB_URL
+          DB_NAME=$DB_NAME
+          DB_USER=$DB_USER
+          DB_PASSWORD=$DB_PASSWORD
+          JWT_TOKEN=$JWT_TOKEN
+          GMAIL_EMAIL=$GMAIL_EMAIL
+          GMAIL_PASSWORD=$GMAIL_PASSWORD
+          CORS_ALLOWED_ORIGINS=$CORS_ALLOWED_ORIGINS
+          EOF
 
-      - name: Start EC2 and Wait
-        run: |
-          aws ec2 start-instances --instance-ids ${{ vars.EC2_ID_INSTANCE_TEST }}
-          aws ec2 wait instance-running --instance-ids ${{ vars.EC2_ID_INSTANCE_TEST }}
-          
-      - name: Wait for SSM ready
-        run: |
-          echo "Waiting for SSM Agent to be online..."
-          i=0
-          while true; do
-            STATUS=$(aws ssm describe-instance-information \
-              --filters "Key=InstanceIds,Values=${{ vars.EC2_ID_INSTANCE_TEST }}" \
-              --query "InstanceInformationList[0].PingStatus" \
-              --output text)
-            
-            if [ "$STATUS" = "Online" ]; then
-              echo "SSM Agent is Online!"
-              break
-            fi
+          echo "deploy.sh 실행..."
+          $SSH "bash -s -- $IMAGE" < deploy.sh
+     
 
-            if [ "$i" -ge 24 ]; then # 5초 * 36 = 180초
-              echo "SSM Agent did not become online in time."
-              exit 1
-            fi
-            
-            echo "Current status: $STATUS. Waiting 5s... ($i)"
-            i=$((i+1))
-            sleep 5
-          done
-
-      - name: Run deploy on EC2
-        env:
-          ECR_IMAGE: ${{ steps.build-image.outputs.image }}
-        run: |
-          COMMAND_ID=$(aws ssm send-command \
-          --instance-ids ${{vars.EC2_ID_INSTANCE_TEST}} \
-          --document-name "AWS-RunShellScript" \
-          --timeout-seconds 900 \
-          --parameters '{
-            "commands": [
-              "export HOME=/home/ubuntu",
-              "mkdir -p /home/ubuntu/app",
-              "cd /home/ubuntu/app",
-
-              "aws s3 cp s3://${{ secrets.AWS_BUCKET_TEST }}/backend-deploy/deploy/deploy.sh .",
-
-              "cat > /home/ubuntu/app/.env << '"'"'EOF'"'"'",
-              "DB_URL=${{secrets.DB_URL_STAGING}}",
-              "DB_NAME=${{secrets.DB_NAME_STAGING}}",
-              "DB_USER=${{secrets.DB_USER}}",
-              "DB_PASSWORD=${{secrets.DB_PASSWORD}}",
-              "JWT_TOKEN=${{secrets.JWT_TOKEN}}",
-              "GMAIL_PASSWORD=${{secrets.GMAIL_PASSWORD}}",
-              "SOL_API_KEY=${{secrets.SOL_API_KEY}}",
-              "SOL_API_SECRET=${{secrets.SOL_API_SECRET}}",
-              "SOL_SENDER_NUMBER=${{secrets.SOL_SENDER_NUMBER}}",
-              "AWS_REGION=${{ vars.AWS_REGION }}",
-              "AWS_BUCKET=${{secrets.AWS_BUCKET_TEST}}",
-              "AWS_CLOUD_FRONT=${{vars.AWS_CLOUD_FRONT}}",
-              "AWS_ACCESS_KEY_ID=${{secrets.AWS_ACCESS_KEY_ID}}",
-              "AWS_SECRET_ACCESS_KEY=${{secrets.AWS_SECRET_ACCESS_KEY}}",
-              "TOSS_CLIENT_KEY=${{secrets.TOSS_CLIENT_KEY}}",
-              "TOSS_SECRET_KEY=${{secrets.TOSS_SECRET_KEY}}",
-              "ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}",
-              "CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }}",
-              "EOF",
-
-              "chmod 600 .env",
-              "chmod +x deploy.sh",
-              "bash deploy.sh ${{steps.build-image.outputs.image}}"
-            ]
-          }' \
-          --query "Command.CommandId" \
-          --output text)
-
-          echo "SSM Command ID: $COMMAND_ID"
-          echo "배포 완료 대기 중 (최대 15분)..."
-          MAX_ATTEMPTS=90
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            STATUS=$(aws ssm get-command-invocation \
-              --command-id $COMMAND_ID \
-              --instance-id ${{vars.EC2_ID_INSTANCE_TEST}} \
-              --query "Status" \
-              --output text 2>/dev/null || echo "Pending")
-
-            echo "[$i/$MAX_ATTEMPTS] Status: $STATUS"
-
-            if [ "$STATUS" = "Success" ]; then
-              echo "배포 성공!"
-              exit 0
-            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ] || [ "$STATUS" = "Cancelled" ]; then
-              echo "배포 실패 (Status: $STATUS)"
-              aws ssm get-command-invocation \
-                --command-id $COMMAND_ID \
-                --instance-id ${{vars.EC2_ID_INSTANCE_TEST}} \
-                --query "StandardOutputContent" \
-                --output text
-              aws ssm get-command-invocation \
-                --command-id $COMMAND_ID \
-                --instance-id ${{vars.EC2_ID_INSTANCE_TEST}} \
-                --query "StandardErrorContent" \
-                --output text
-              exit 1
-            fi
-
-            sleep 10
-          done
-
-          echo "배포 타임아웃 ($((MAX_ATTEMPTS * 10))초 초과)"
-          exit 1
+     

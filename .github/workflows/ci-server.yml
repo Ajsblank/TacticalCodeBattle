@@ -12,19 +12,11 @@ jobs:
   server:
     env: 
       DB_USER: ${{ secrets.DB_USER }}
-      DB_NAME: ${{ secrets.DB_NAME_STAGING }}
+      DB_NAME: ${{ secrets.DB_NAME }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-      DB_URL: ${{ secrets.DB_URL_STAGING }}
+      DB_URL: ${{ secrets.DB_URL }}
       JWT_TOKEN: ${{secrets.JWT_TOKEN}}
       GMAIL_PASSWORD: ${{secrets.GMAIL_PASSWORD}}
-      SOL_API_KEY: ${{secrets.SOL_API_KEY}}
-      SOL_API_SECRET: ${{secrets.SOL_API_SECRET}}
-      SOL_SENDER_NUMBER: ${{secrets.SOL_SENDER_NUMBER}}
-      AWS_REGION: ${{secrets.AWS_REGION}}
-      AWS_BUCKET_TEST: ${{secrets.AWS_BUCKET_TEST}}
-      AWS_CLOUD_FRONT: ${{vars.AWS_CLOUD_FRONT}}
-      TOSS_CLIENT_KEY: ${{secrets.TOSS_CLIENT_KEY}}
-      TOSS_SECRET_KEY: ${{secrets.TOSS_CLIENT_KEY}}
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: 6379
     runs-on: ubuntu-latest
