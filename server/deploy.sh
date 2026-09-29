@@ -64,6 +64,6 @@ sudo nginx -s reload
 echo "▶ 기존 컨테이너 $ACTIVE_CONTAINER 종료"
 docker stop $ACTIVE_CONTAINER 2>/dev/null || true
 docker rm $ACTIVE_CONTAINER 2>/dev/null || true
-
+    
 docker image prune -f
 echo "🎉 배포 완료 — 현재 서비스 포트: $IDLE_PORT"
