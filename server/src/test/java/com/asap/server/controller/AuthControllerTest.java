@@ -22,8 +22,6 @@ import com.asap.server.dto.request.EmailResendRequest;
 import com.asap.server.dto.request.EmailVerifyRequest;
 import com.asap.server.dto.request.LoginRequest;
 import com.asap.server.dto.request.SignupRequest;
-import com.asap.server.dto.request.SmsCodeVerifyRequest;
-import com.asap.server.dto.request.SmsVerifyRequest;
 import com.asap.server.dto.request.TokenRefreshRequest;
 import com.asap.server.dto.request.WithdrawRequest;
 import com.asap.server.dto.response.LoginResponse;
@@ -144,23 +142,4 @@ class AuthControllerTest {
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
-    @Test
-    @DisplayName("SMS 인증번호 발송 성공")
-    void sendSMS_success() {
-        doNothing().when(authService).sendSMS(any());
-
-        ResponseEntity<String> result = authController.sendSMS(new SmsVerifyRequest());
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-    }
-
-    @Test
-    @DisplayName("SMS 인증 완료 성공")
-    void verifySMS_success() {
-        doNothing().when(authService).verifySMS(any());
-
-        ResponseEntity<String> result = authController.verifySMS(new SmsCodeVerifyRequest());
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-    }
 }

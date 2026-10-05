@@ -58,7 +58,6 @@ import com.asap.server.repository.ProfileRepository;
 import com.asap.server.service.ContestRunService;
 import com.asap.server.service.ContestService;
 import com.asap.server.service.FullLeagueService;
-import com.asap.server.service.S3Service;
 import com.asap.server.service.SseService;
 import com.asap.server.service.SwissLeagueService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -84,7 +83,6 @@ public class ContestController {
 
     private final ContestService contestService;
     private final ContestRunService contestRunService;
-    private final S3Service s3Service;
     private final ObjectMapper objectMapper;
     private final CodeBattleContestRepository contestRepository;
     private final FullLeagueService fullLeagueService;
@@ -251,17 +249,9 @@ public class ContestController {
             if (contest.getStatus() != ContestStatus.END) {
                 log.info("end 상태가 아니지만 임시 조회 허용합니다.");
             }
-
-            String key = s3Service.buildFinalResultKey(contestId);
-            String json;
-            try {
-                json = s3Service.readFileAsString(key);
-            } catch (Exception e) {
-                // S3 파일 없음 = 종료는 됐지만 아직 집계 중
-                return ResponseEntity.accepted()
-                        .body(Map.of("message", "아직 집계 중이거나 데이터가 존재하지 않습니다."));
-            }
-            FinalResultResponse response = objectMapper.readValue(json, FinalResultResponse.class);
+            // 결과 조회
+            empty;    
+            FinalResultResponse response;
             Map<Long, String> nicknameTagMap = getNicknameTagMap(
                     response.getFinalStandings().stream().map(FinalResultResponse.StandingDto::getUserId).toList());
             response.getFinalStandings()

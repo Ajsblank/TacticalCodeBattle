@@ -8,15 +8,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.asap.server.config.JwtTokenProvider;
 import com.asap.server.domain.Profile;
 import com.asap.server.domain.Users;
 import com.asap.server.dto.request.EmailResendRequest;
 import com.asap.server.dto.request.EmailVerifyRequest;
 import com.asap.server.dto.request.LoginRequest;
 import com.asap.server.dto.request.SignupRequest;
-import com.asap.server.dto.request.SmsCodeVerifyRequest;
-import com.asap.server.dto.request.SmsVerifyRequest;
 import com.asap.server.dto.request.WithdrawRequest;
 import com.asap.server.dto.response.LoginResponse;
 import com.asap.server.repository.CodeBattleContestRepository;
@@ -37,10 +34,8 @@ public class AuthService {
 
     private final usersRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider jwtTokenProvider;
     private final TokenService tokenService;
     private final MailService mailService;
-    private final SmsService smsService;
     private final ProfileService profileService;
     private final CodeBattleParticipantRepository participantRepository;
     private final ContestReviewerRepository contestReviewerRepository;
@@ -181,13 +176,7 @@ public class AuthService {
         log.info("회원가입 인증번호 발송 완료 - 이메일: {}, 닉네임: {}", email, nickname);
     }
 
-    public void sendSMS(SmsVerifyRequest request) {
-        smsService.sendSMS(request);
-    }
-
-    public void verifySMS(SmsCodeVerifyRequest request) {
-        smsService.verifySMS(request);
-    }
+  
 
     @Transactional
     public LoginResponse autoLogin(String token) {

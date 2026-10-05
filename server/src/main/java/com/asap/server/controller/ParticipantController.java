@@ -93,7 +93,7 @@ public class ParticipantController {
 
         CodeSubmitRequest request = new CodeSubmitRequest();
         request.setUserId(user.getId());
-        request.setProblemId(contestId);
+        request.setContestId(contestId);
         request.setLanguage(req.getLanguage());
         request.setSourceCode(req.getSourceCode());
         codeController.submitBattle(request);

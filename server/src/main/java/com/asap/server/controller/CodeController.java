@@ -30,7 +30,6 @@ import com.asap.server.repository.CodeBattleMatchRepository;
 import com.asap.server.repository.CodeBattleParticipantRepository;
 import com.asap.server.repository.CodeBattleSubmissionRepository;
 import com.asap.server.repository.usersRepository;
-import com.asap.server.service.S3Service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -53,19 +52,22 @@ public class CodeController {
     private final CodeBattleContestRepository contestRepository;
     private final CodeBattleSubmissionRepository submissionRepository;
     private final CodeBattleParticipantRepository participantRepository;
-    private final S3Service s3Service;
 
     private static final String CODE_BATTLE_GRADING_QUEUE_KEY = "code_battle_grading_queue";
     private static final String CODE_BATTLE_TEST_QUEUE_KEY = "code_battle_test_queue";
 
     @PostMapping("/submit/codebattle")
-    @Operation(description = "language는 eunm 타입입니다. (CPP,PYTHON,JAVA,C)")
+    @Operation(summary="코드 제출", description = "language는 eunm 타입입니다. (CPP,PYTHON,JAVA,C)")
     public ResponseEntity<CodeSubmitResponse> submitBattle(@Valid @RequestBody CodeSubmitRequest request) {
         try {
-            CodeBattleContest contest = contestRepository.findById(request.getProblemId())
+
+            Long userId=request.getUserId();
+            Long contestId = request.getContestId();
+
+            CodeBattleContest contest = contestRepository.findById(contestId)
                     .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 대회입니다."));
 
-            Users user = userRepository.findById(request.getUserId())
+            Users user = userRepository.findById(userId)
                     .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
             List<CodeBattleExampleAI> aiList = exampleAIRepository
@@ -79,13 +81,11 @@ public class CodeController {
                     user,
                     contest,
                     request.getLanguage(),
+                    request.getSourceCode(),
                     "PENDING");
             submissionRepository.save(submission);
 
             // 참가자 테이블을 조회한다
-            Long userId = submission.getUser().getId();
-            Long contestId = submission.getContest().getId();
-
             CodeBattleParticipant participant = participantRepository
                     .findByUserIdAndContestId(userId, contestId)
                     .orElse(null);
@@ -160,7 +160,7 @@ public class CodeController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("본인의 제출만 조회할 수 있습니다.");
             }
 
-            String code = s3Service.readFileAsString(submission.getCodeUrl());
+            String code = submission.getCodeUrl();
             return ResponseEntity.ok(SubmissionCodeResponse.of(submission, code));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -208,7 +208,7 @@ public class CodeController {
     }
 
     @PostMapping("/submit/codebattle/{contestId}/codeSelect")
-    @Operation(description = "MANUAL 모드로 전환하고 지정한 제출 코드를 최종 코드로 저장합니다.")
+    @Operation(summary="제출 코드 선택",description = "MANUAL 모드로 전환하고 지정한 제출 코드를 최종 코드로 저장합니다.")
     public ResponseEntity<CodeSubmitResponse> manualSelectSubmission(
             @PathVariable Long contestId,
             @AuthenticationPrincipal Long userId,

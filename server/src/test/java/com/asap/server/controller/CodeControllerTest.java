@@ -37,7 +37,6 @@ import com.asap.server.repository.CodeBattleMatchRepository;
 import com.asap.server.repository.CodeBattleParticipantRepository;
 import com.asap.server.repository.CodeBattleSubmissionRepository;
 import com.asap.server.repository.usersRepository;
-import com.asap.server.service.S3Service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -62,8 +61,6 @@ class CodeControllerTest {
     private CodeBattleSubmissionRepository submissionRepository;
     @Mock
     private CodeBattleParticipantRepository participantRepository;
-    @Mock
-    private S3Service s3Service;
     @InjectMocks
     private CodeController codeController;
 
@@ -162,9 +159,9 @@ class CodeControllerTest {
     // ─────────────────────────────────────────────────────────────
 
     private CodeSubmitRequest buildSubmitRequest(
-            Long problemId, Long userId, Language language, String sourceCode) {
+            Long contestId, Long userId, Language language, String sourceCode) {
         CodeSubmitRequest req = new CodeSubmitRequest();
-        req.setProblemId(problemId);
+        req.setContestId(contestId);
         req.setUserId(userId);
         req.setLanguage(language);
         req.setSourceCode(sourceCode);

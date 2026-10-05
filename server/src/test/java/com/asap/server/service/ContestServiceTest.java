@@ -59,8 +59,6 @@ class ContestServiceTest {
         @Mock
         private ContestRunService contestRun;
         @Mock
-        private S3Service s3Service;
-        @Mock
         private ContestReviewerRepository contestReviewerRepository;
         @Mock
         private CodeBattleMatchRepository matchRepository;

@@ -13,7 +13,7 @@ public class CodeSubmitRequest {
     @NotNull
     private Long userId;
     @NotNull
-    private Long problemId;
+    private Long contestId;
     @NotNull
     private Language language;
     @NotBlank

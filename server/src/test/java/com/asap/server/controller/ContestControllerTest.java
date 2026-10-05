@@ -47,7 +47,6 @@ import com.asap.server.repository.ProfileRepository;
 import com.asap.server.service.ContestRunService;
 import com.asap.server.service.ContestService;
 import com.asap.server.service.FullLeagueService;
-import com.asap.server.service.S3Service;
 import com.asap.server.service.SseService;
 import com.asap.server.service.SwissLeagueService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,7 +57,6 @@ class ContestControllerTest {
 
     @Mock private ContestService contestService;
     @Mock private ContestRunService contestRunService;
-    @Mock private S3Service s3Service;
     @Spy  private ObjectMapper objectMapper = new ObjectMapper();
     @Mock private CodeBattleContestRepository contestRepository;
     @Mock private FullLeagueService fullLeagueService;

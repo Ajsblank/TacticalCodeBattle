@@ -36,7 +36,6 @@ public class FullLeagueService {
     private final CodeBattleMatchRepository matchRepository;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
-    private final S3Service s3Service;
     private final SseService sseService;
 
     private static final String CODE_BATTLE_FULL_LEAGUE_QUEUE_KEY = "code_battle_full_league_queue";
@@ -77,9 +76,9 @@ public class FullLeagueService {
 
             Map<Long, String> codeCache = new HashMap<>();
             for (CodeBattleSubmission s : submissions) {
-                codeCache.put(s.getId(), s3Service.readFileAsString(s.getCodeUrl()));
+                codeCache.put(s.getId(), s.getCodeUrl());
             }
-            log.info("[풀리그] 대회 ID={}을 위한 코드를 S3에서 불러옴", contestId);
+            log.info("[풀리그] 대회 ID={}을 위한 제출 코드를 불러옴", contestId);
             log.info("[풀리그] 풀리그 대회 ID: {}, {}개의 제출 코드로 매칭을 생성합니다.", contestId, submissions.size());
 
             int expected = (submissions.size() * (submissions.size() - 1)) / 2;
@@ -200,10 +199,13 @@ public class FullLeagueService {
             Map<Long, LocalDateTime> submissionTimeMap = new HashMap<>();
             List<CodeBattleParticipant> participants = participantRepository.findByContestId(contestId);
             for (CodeBattleParticipant p : participants) {
-                if (p.getSubmission() != null && p.getSubmission().getCreatedAt() != null) {
-                    submissionTimeMap.put(p.getUser().getId(), p.getSubmission().getCreatedAt());
+                if (p.getSubmission() == null)
+                    continue;
+                if (p.getSubmission().getCreatedAt()==null) {
+                    log.debug("submission의 생성 일자가 없습니다. submissionId={}",p.getSubmission().getId());
+                    continue;
                 }
-            }
+                submissionTimeMap.put(p.getUser().getId(), p.getSubmission().getCreatedAt());
             // 유저 ID 목록 추출 후 points 기준 정렬
             List<Long> userIds = new ArrayList<>(userMatchIds.keySet());
             userIds.sort((a, b) -> { // Tim Sort 사용
@@ -221,7 +223,7 @@ public class FullLeagueService {
                 return timeA.compareTo(timeB);
             });
             int currentRank = 1;
-            // ✅ 4. standings 생성
+            // 최종 결과 생성
             List<Map<String, Object>> standings = new ArrayList<>();
             for (int i = 0; i < userIds.size(); i++) {
                 Long userId = userIds.get(i);
@@ -254,10 +256,8 @@ public class FullLeagueService {
             finalResult.put("final-standings", standings);
             String json = objectMapper.writeValueAsString(finalResult);
 
-            // S3 저장
-            String key = s3Service.buildFinalResultKey(contestId);
-            s3Service.uploadJsonResult(key, json);
-            log.info("[풀리그] contestId={} S3 저장 완료", contestId);
+            // 최종 결과 저장
+            empty;
 
             // SSE 전송 — 참가자 전원에게
             for (Long userId : userIds) {

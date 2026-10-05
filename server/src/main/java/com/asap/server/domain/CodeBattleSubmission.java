@@ -55,11 +55,12 @@ public class CodeBattleSubmission {
   @Column(name = "created_at")
   private LocalDateTime createdAt;
 
-  public CodeBattleSubmission(Users user, CodeBattleContest contest, Language language,
+  public CodeBattleSubmission(Users user, CodeBattleContest contest, Language language, String sourceCode,
       String result) {
     this.user = user;
     this.contest = contest;
     this.language = Objects.requireNonNull(language, "language는 null일 수 없습니다.");
+    this.codeUrl = sourceCode;
     this.result = result;
   }
 

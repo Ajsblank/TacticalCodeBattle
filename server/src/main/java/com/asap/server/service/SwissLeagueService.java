@@ -53,7 +53,6 @@ public class SwissLeagueService {
   private final StringRedisTemplate redisTemplate;
   private static final String CODE_BATTLE_SWISS_LEAGUE_QUEUE_KEY = "code_battle_swiss_league_queue";
 
-  private final S3Service s3Service;
   private final SseService sseService;
   private final String swissRound = "swiss:round:";
   private final String totalKey = ":total";

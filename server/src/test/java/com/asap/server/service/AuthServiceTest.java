@@ -30,8 +30,6 @@ import com.asap.server.dto.request.EmailResendRequest;
 import com.asap.server.dto.request.EmailVerifyRequest;
 import com.asap.server.dto.request.LoginRequest;
 import com.asap.server.dto.request.SignupRequest;
-import com.asap.server.dto.request.SmsCodeVerifyRequest;
-import com.asap.server.dto.request.SmsVerifyRequest;
 import com.asap.server.dto.request.WithdrawRequest;
 import com.asap.server.dto.response.LoginResponse;
 import com.asap.server.repository.CodeBattleContestRepository;
@@ -48,7 +46,6 @@ class AuthServiceTest {
     @Mock private JwtTokenProvider jwtTokenProvider;
     @Mock private TokenService tokenService;
     @Mock private MailService mailService;
-    @Mock private SmsService smsService;
     @Mock private ProfileService profileService;
     @Mock private CodeBattleParticipantRepository participantRepository;
     @Mock private ContestReviewerRepository contestReviewerRepository;
@@ -322,25 +319,4 @@ class AuthServiceTest {
     // sendSMS / verifySMS
     // ─────────────────────────────────────────────────────────────
 
-    @Test
-    @DisplayName("SMS 인증번호 발송 성공")
-    void sendSMS_success() {
-        SmsVerifyRequest request = new SmsVerifyRequest();
-        doNothing().when(smsService).sendSMS(request);
-
-        authService.sendSMS(request);
-
-        verify(smsService).sendSMS(request);
-    }
-
-    @Test
-    @DisplayName("SMS 인증 완료 성공")
-    void verifySMS_success() {
-        SmsCodeVerifyRequest request = new SmsCodeVerifyRequest();
-        doNothing().when(smsService).verifySMS(request);
-
-        authService.verifySMS(request);
-
-        verify(smsService).verifySMS(request);
-    }
 }

@@ -24,7 +24,6 @@ public class ProfileService {
 
   private final usersRepository userRepository;
   private final ProfileRepository profileRepository;
-  private final S3Service s3Service;
   private String cloudFrontDomain = "empty";
 
   @Transactional(readOnly = true)
