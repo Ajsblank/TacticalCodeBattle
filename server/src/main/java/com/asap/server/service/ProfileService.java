@@ -1,6 +1,5 @@
 package com.asap.server.service;
 
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -24,7 +23,6 @@ public class ProfileService {
 
   private final usersRepository userRepository;
   private final ProfileRepository profileRepository;
-  private String cloudFrontDomain = "empty";
 
   @Transactional(readOnly = true)
   public ProfileResponse getMyProfile(Long userId) {
@@ -36,7 +34,7 @@ public class ProfileService {
       throw new IllegalArgumentException("프로필이 존재하지 않습니다.");
     }
 
-    return ProfileResponse.from(profile, cloudFrontDomain);
+    return ProfileResponse.from(profile);
   }
 
   @Transactional
@@ -55,19 +53,9 @@ public class ProfileService {
       int newTag = allocateNextTag(newNickname);
       profile.updateNicknameAndTag(newNickname, newTag);
     }
-    // 이미지가 있을 때만 S3 업로드
-    String imageUrl = null;
-    if (request.getImageBase64() != null) {
-      String base64Data = request.getImageBase64();
-      if (base64Data.contains(",")) {
-        base64Data = base64Data.split(",")[1];
-      }
-      byte[] imageBytes = Base64.getDecoder().decode(base64Data);
-      imageUrl = s3Service.uploadProfileImage(userId, imageBytes);
-    }
-    profile.updateDetails(request.getBio(), request.getAffiliation(), imageUrl);
+    profile.updateDetails(request.getBio(), request.getAffiliation(), request.getImageBase64());
     Profile updated = profileRepository.save(profile);
-    return ProfileResponse.from(updated, cloudFrontDomain);
+    return ProfileResponse.from(updated);
   }
 
   @Transactional(readOnly = true)
@@ -76,7 +64,7 @@ public class ProfileService {
     Profile profile = profileRepository.findByNicknameAndTag(parsed.nickname(), parsed.tag())
         .orElseThrow(() -> new IllegalArgumentException("해당 프로필을 찾을 수 없습니다."));
 
-    return ProfileResponse.from(profile, cloudFrontDomain);
+    return ProfileResponse.from(profile);
   }
 
   public Profile createProfile(Users user, String nickname) {
@@ -100,10 +88,7 @@ public class ProfileService {
             profile -> {
               String tagCode = String.format("%04d", profile.getTag());
               String nicknameTag = profile.getNickname() + "-" + tagCode;
-              String imageUrl = profile.getImage_url() != null
-                  ? (cloudFrontDomain.endsWith("/") ? cloudFrontDomain : cloudFrontDomain + "/")
-                      + profile.getImage_url()
-                  : null;
+              String imageUrl = profile.getImage_url();
               return ProfileListResponse.builder()
                   .nicknameTag(nicknameTag)
                   .imageUrl(imageUrl)

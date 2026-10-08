@@ -15,10 +15,12 @@ import com.asap.server.domain.CodeBattleContest;
 import com.asap.server.domain.CodeBattleMatch;
 import com.asap.server.domain.CodeBattleParticipant;
 import com.asap.server.domain.CodeBattleSubmission;
+import com.asap.server.domain.FullLeagueResult;
 import com.asap.server.dto.response.CodeBattleMatchResult;
 import com.asap.server.repository.CodeBattleContestRepository;
 import com.asap.server.repository.CodeBattleMatchRepository;
 import com.asap.server.repository.CodeBattleParticipantRepository;
+import com.asap.server.repository.FullLeagueResultRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -31,6 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class FullLeagueService {
 
+    private final FullLeagueResultRepository fullLeagueResultRepository;
     private final CodeBattleContestRepository contestRepository;
     private final CodeBattleParticipantRepository participantRepository;
     private final CodeBattleMatchRepository matchRepository;
@@ -201,70 +204,75 @@ public class FullLeagueService {
             for (CodeBattleParticipant p : participants) {
                 if (p.getSubmission() == null)
                     continue;
-                if (p.getSubmission().getCreatedAt()==null) {
-                    log.debug("submission의 생성 일자가 없습니다. submissionId={}",p.getSubmission().getId());
+                if (p.getSubmission().getCreatedAt() == null) {
+                    log.debug("submission의 생성 일자가 없습니다. submissionId={}", p.getSubmission().getId());
                     continue;
                 }
                 submissionTimeMap.put(p.getUser().getId(), p.getSubmission().getCreatedAt());
-            // 유저 ID 목록 추출 후 points 기준 정렬
-            List<Long> userIds = new ArrayList<>(userMatchIds.keySet());
-            userIds.sort((a, b) -> { // Tim Sort 사용
-                // 정렬에 무승부 점수 0.5점 삭제
-                double pointsA = winsMap.getOrDefault(a, 0) * 1.0;
-                double pointsB = winsMap.getOrDefault(b, 0) * 1.0;
-                // 1순위: points 내림차순
-                int cmp = Double.compare(pointsB, pointsA);
-                if (cmp != 0)
-                    return cmp;
+                // 유저 ID 목록 추출 후 points 기준 정렬
+                List<Long> userIds = new ArrayList<>(userMatchIds.keySet());
+                userIds.sort((a, b) -> { // Tim Sort 사용
+                    // 정렬에 무승부 점수 0.5점 삭제
+                    double pointsA = winsMap.getOrDefault(a, 0) * 1.0;
+                    double pointsB = winsMap.getOrDefault(b, 0) * 1.0;
+                    // 1순위: points 내림차순
+                    int cmp = Double.compare(pointsB, pointsA);
+                    if (cmp != 0)
+                        return cmp;
 
-                // 2순위: 제출 시간 오름차순 (빠를수록 유리)
-                LocalDateTime timeA = submissionTimeMap.getOrDefault(a, LocalDateTime.MAX);
-                LocalDateTime timeB = submissionTimeMap.getOrDefault(b, LocalDateTime.MAX);
-                return timeA.compareTo(timeB);
-            });
-            int currentRank = 1;
-            // 최종 결과 생성
-            List<Map<String, Object>> standings = new ArrayList<>();
-            for (int i = 0; i < userIds.size(); i++) {
-                Long userId = userIds.get(i);
+                    // 2순위: 제출 시간 오름차순 (빠를수록 유리)
+                    LocalDateTime timeA = submissionTimeMap.getOrDefault(a, LocalDateTime.MAX);
+                    LocalDateTime timeB = submissionTimeMap.getOrDefault(b, LocalDateTime.MAX);
+                    return timeA.compareTo(timeB);
+                });
+                int currentRank = 1;
+                // 최종 결과 생성
+                List<Map<String, Object>> standings = new ArrayList<>();
+                for (int i = 0; i < userIds.size(); i++) {
+                    Long userId = userIds.get(i);
 
-                int wins = winsMap.getOrDefault(userId, 0);
-                int draws = drawsMap.getOrDefault(userId, 0);
-                int losses = lossesMap.getOrDefault(userId, 0);
-                // draw 값은 현재 집계에 사용하지 않음 (0 점)
-                double points = wins * 1.0;
+                    int wins = winsMap.getOrDefault(userId, 0);
+                    int draws = drawsMap.getOrDefault(userId, 0);
+                    int losses = lossesMap.getOrDefault(userId, 0);
+                    // draw 값은 현재 집계에 사용하지 않음 (0 점)
+                    double points = wins * 1.0;
 
-                int rank = (i > 0 && (double) standings.get(i - 1).get("points") == points)
-                        ? (int) standings.get(i - 1).get("rank")
-                        : currentRank;
-                currentRank++;
+                    int rank = (i > 0 && (double) standings.get(i - 1).get("points") == points)
+                            ? (int) standings.get(i - 1).get("rank")
+                            : currentRank;
+                    currentRank++;
 
-                Map<String, Object> standing = new LinkedHashMap<>();
-                standing.put("user_id", userId);
-                standing.put("wins", wins);
-                standing.put("draws", draws);
-                standing.put("losses", losses);
-                standing.put("rank", rank);
-                standing.put("points", points);
-                standing.put("match_ids", userMatchIds.getOrDefault(userId, List.of()));
-                standings.add(standing);
+                    Map<String, Object> standing = new LinkedHashMap<>();
+                    standing.put("user_id", userId);
+                    standing.put("wins", wins);
+                    standing.put("draws", draws);
+                    standing.put("losses", losses);
+                    standing.put("rank", rank);
+                    standing.put("points", points);
+                    standing.put("match_ids", userMatchIds.getOrDefault(userId, List.of()));
+                    standings.add(standing);
+                }
+
+                // 최종 JSON 생성
+                Map<String, Object> finalResult = new LinkedHashMap<>();
+                finalResult.put("total_participants", userIds.size());
+                finalResult.put("final-standings", standings);
+                String json = objectMapper.writeValueAsString(finalResult);
+
+                // 최종 결과 저장
+                FullLeagueResult saved = fullLeagueResultRepository.findByContestId(contestId)
+                        .orElseGet(() -> FullLeagueResult.of(contestId));
+                saved.update(userIds.size(), finalResult);
+                fullLeagueResultRepository.save(saved);
+                log.info("[풀리그] contestId={} 결과 DB 저장 완료", contestId);
+
+                // SSE 전송 — 참가자 전원에게
+                for (Long userId : userIds) {
+                    sseService.sendToUser(userId, json, "contest-end");
+                }
+                log.info("[풀리그] contestId={} SSE 전송 완료", contestId);
+
             }
-
-            // 최종 JSON 생성
-            Map<String, Object> finalResult = new LinkedHashMap<>();
-            finalResult.put("total_participants", userIds.size());
-            finalResult.put("final-standings", standings);
-            String json = objectMapper.writeValueAsString(finalResult);
-
-            // 최종 결과 저장
-            empty;
-
-            // SSE 전송 — 참가자 전원에게
-            for (Long userId : userIds) {
-                sseService.sendToUser(userId, json, "contest-end");
-            }
-            log.info("[풀리그] contestId={} SSE 전송 완료", contestId);
-
         } catch (Exception e) {
             log.error("[풀리그] contestId={} 집계 저장 실패: {}", contestId, e.getMessage());
         } finally {
@@ -316,4 +324,5 @@ public class FullLeagueService {
             aggregateAndSave(contestId);
         }
     }
+
 }

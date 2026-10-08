@@ -22,6 +22,7 @@ import com.asap.server.domain.ContestSwissMatch;
 import com.asap.server.domain.ContestSwissRound;
 import com.asap.server.domain.ContestSwissSession;
 import com.asap.server.domain.Profile;
+import com.asap.server.domain.SwissSessionResult;
 import com.asap.server.dto.response.CodeBattleMatchResult;
 import com.asap.server.global.type.ContestStatus;
 import com.asap.server.global.type.MatchStatus;
@@ -31,6 +32,7 @@ import com.asap.server.repository.CodeBattleParticipantRepository;
 import com.asap.server.repository.ContestSwissMatchRepository;
 import com.asap.server.repository.ContestSwissRoundRepository;
 import com.asap.server.repository.ContestSwissSessionRepository;
+import com.asap.server.repository.SwissSessionResultRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -43,6 +45,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 public class SwissLeagueService {
+  private final SwissSessionResultRepository swissSessionResultRepository;
   private final CodeBattleContestRepository contestRepository;
   private final CodeBattleParticipantRepository participantRepository;
   private final ContestSwissSessionRepository swissSessionRepository;
@@ -222,11 +225,6 @@ public class SwissLeagueService {
     // 라운드 Redis 초기화 - total을 마지막에 세팅 (경합 방지)
     redisTemplate.opsForValue().set(swissRound + round.getId() + totalKey, String.valueOf(matchsPerRound));
     redisTemplate.opsForValue().set(swissRound + round.getId() + doneKey, "0");
-    // S3 읽기를 병렬로 수행해 DB 커넥션 보유 시간을 단축한다.
-    Map<Long, String> codeCache = participants.parallelStream()
-        .collect(Collectors.toConcurrentMap(
-            p -> p.getSubmission().getId(),
-            p -> s3Service.readFileAsString(p.getSubmission().getCodeUrl())));
 
     int matchCount = 0;
     for (int j = 0; j + 1 < participants.size(); j += 2) {
@@ -253,8 +251,8 @@ public class SwissLeagueService {
             contest,
             p1.getSubmission(),
             p2.getSubmission(),
-            codeCache.get(p1.getSubmission().getId()),
-            codeCache.get(p2.getSubmission().getId()),
+            p1.getSubmission().getCodeUrl(),
+            p2.getSubmission().getCodeUrl(),
             0);
         redisTemplate.opsForList().leftPush(swissRound + round.getId() + matchKey, String.valueOf(savedMatch.getId()));
         matchCount++;
@@ -550,11 +548,12 @@ public class SwissLeagueService {
       result.put("final_standings", standings);
       result.put("rounds", roundList);
       String json = objectMapper.writeValueAsString(result);
-
-      String key = String.format("backend-deploy/contest-resource/%d/swiss-result/session-%d", contestId,
-          session.getSessionNumber());
-      s3Service.uploadJsonResult(key, json);
-      log.info("[스위스리그] sessionId={} S3 저장 완료. key={}", sessionId, key);
+      // 결과 저장
+      SwissSessionResult saved = swissSessionResultRepository.findBySessionId(sessionId)
+          .orElseGet(() -> SwissSessionResult.of(contestId, sessionId));
+      saved.update(userIds.size(), result); // 이미 만든 LinkedHashMap
+      swissSessionResultRepository.save(saved);
+      log.info("[스위스리그] sessionId={} 결과 DB 저장 완료", sessionId);
 
       // 세션 완료 처리
       session.setFinishedAt(LocalDateTime.now());

@@ -19,12 +19,10 @@ public class ProfileResponse {
   private String affiliation;
   private String imageUrl;
 
-  public static ProfileResponse from(Profile profile, String cloudFrontDomain) {
+  public static ProfileResponse from(Profile profile) {
     String tagCode = String.format("%04d", profile.getTag());
     String nicknameTag = profile.getNickname() + "-" + tagCode;
-    String imageUrl = profile.getImage_url() != null
-        ? (cloudFrontDomain.endsWith("/") ? cloudFrontDomain : cloudFrontDomain + "/") + profile.getImage_url()
-        : null;
+    String imageUrl = profile.getImage_url();
     return ProfileResponse.builder()
         .userId(profile.getUser().getId())
         .nickname(profile.getNickname())

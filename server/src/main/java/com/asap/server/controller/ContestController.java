@@ -35,6 +35,7 @@ import com.asap.server.domain.CodeBattleContest;
 import com.asap.server.domain.CodeBattleMatch;
 import com.asap.server.domain.ContestSwissMatch;
 import com.asap.server.domain.ContestSwissSession;
+import com.asap.server.domain.FullLeagueResult;
 import com.asap.server.dto.request.CreateCertifiedContestRequest;
 import com.asap.server.dto.request.CreateUncertifiedContestRequest;
 import com.asap.server.dto.request.UpdateContestCertifiedRequest;
@@ -54,6 +55,7 @@ import com.asap.server.repository.CodeBattleContestRepository;
 import com.asap.server.repository.CodeBattleMatchRepository;
 import com.asap.server.repository.ContestSwissMatchRepository;
 import com.asap.server.repository.ContestSwissSessionRepository;
+import com.asap.server.repository.FullLeagueResultRepository;
 import com.asap.server.repository.ProfileRepository;
 import com.asap.server.service.ContestRunService;
 import com.asap.server.service.ContestService;
@@ -81,6 +83,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ContestController {
 
+    private final FullLeagueResultRepository fullLeagueResultRepository;
     private final ContestService contestService;
     private final ContestRunService contestRunService;
     private final ObjectMapper objectMapper;
@@ -250,8 +253,10 @@ public class ContestController {
                 log.info("end 상태가 아니지만 임시 조회 허용합니다.");
             }
             // 결과 조회
-            empty;    
-            FinalResultResponse response;
+            Map<String, Object> result = fullLeagueResultRepository.findByContestId(contestId)
+                    .map(FullLeagueResult::getResult)
+                    .orElseThrow(() -> new IllegalArgumentException("풀리그 결과가 없습니다. contestId=" + contestId));
+            FinalResultResponse response = objectMapper.convertValue(result, FinalResultResponse.class);
             Map<Long, String> nicknameTagMap = getNicknameTagMap(
                     response.getFinalStandings().stream().map(FinalResultResponse.StandingDto::getUserId).toList());
             response.getFinalStandings()
